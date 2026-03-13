@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
   const supabase = createServiceRoleClient()
 
   if (event.type === 'checkout.session.completed') {
-    const session = event.data.object as Stripe.CheckoutSession
+    const session = event.data.object as Stripe.Checkout.Session
     const userId = session.metadata?.userId
     const subscriptionId = session.subscription as string
 
