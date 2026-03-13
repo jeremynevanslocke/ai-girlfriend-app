@@ -274,18 +274,23 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
         </div>
 
         {/* Contacts Header */}
-        <div className="px-6 py-4 flex items-center justify-between">
-          <h2 className="text-lg font-bold text-gray-900">Your contacts</h2>
-          <button
-            onClick={async () => {
-              await supabase.auth.signOut()
-              window.location.href = '/login'
-            }}
-            className="text-xs text-gray-400 hover:text-gray-600 transition"
-          >
-            Log out
-          </button>
-        </div>
+          <div className="px-6 py-4 flex items-center justify-between">
+            <h2 className="text-lg font-bold text-gray-900">Your contacts</h2>
+            <div className="flex items-center gap-3">
+              <Link href="/dashboard" className="text-xs text-gray-400 hover:text-gray-600 transition">
+                Account
+              </Link>
+              <button
+                onClick={async () => {
+                  await supabase.auth.signOut()
+                  window.location.href = '/login'
+                }}
+                className="text-xs text-gray-400 hover:text-gray-600 transition"
+              >
+                Log out
+              </button>
+            </div>
+          </div>
 
         {/* Contact List */}
         <div className="flex-1 overflow-y-auto">
