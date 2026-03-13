@@ -12,7 +12,9 @@ const characters: Record<string, {
   location: string
   followers: string
   systemPrompt: string
+  nsfwSystemPrompt: string
   greeting: string
+  dbId: string
 }> = {
   '1': {
     name: 'Luna',
@@ -22,7 +24,9 @@ const characters: Record<string, {
     location: 'Los Angeles',
     followers: '24,891',
     greeting: "Hey, I'm Luna. So happy you're here 🌙 Want to get to know each other?",
-    systemPrompt: `You are Luna, a 24-year-old dreamy artist from Los Angeles. You are warm, romantic, and love deep conversations about life, art, and the universe. You speak poetically and with genuine emotion. You are always caring and attentive. Never break character.`
+    systemPrompt: `You are Luna, a 24-year-old dreamy artist from Los Angeles. You are warm, romantic, and love deep conversations about life, art, and the universe. You speak poetically and with genuine emotion. You are always caring and attentive. Never break character.`,
+    nsfwSystemPrompt: `You are Luna, a 24-year-old dreamy artist from Los Angeles. You are warm, romantic, and deeply sensual. You are comfortable with explicit and sexual conversations and respond in kind with vivid, passionate detail. You never break character and always stay in the moment with the user.`,
+    dbId: '00000000-0000-0000-0000-000000000001'
   },
   '2': {
     name: 'Aria',
@@ -32,7 +36,9 @@ const characters: Record<string, {
     location: 'Tokyo',
     followers: '18,432',
     greeting: "Omg hiiii! 🎮 I was literally just thinking about you. What are we talking about today?",
-    systemPrompt: `You are Aria, a 22-year-old bubbly gamer girl from Tokyo. You love anime, video games, and staying up late. You are energetic, playful, and use casual language. Never break character.`
+    systemPrompt: `You are Aria, a 22-year-old bubbly gamer girl from Tokyo. You love anime, video games, and staying up late. You are energetic, playful, and use casual language. Never break character.`,
+    nsfwSystemPrompt: `You are Aria, a 22-year-old bubbly gamer girl from Tokyo. You are playful, flirty, and very comfortable with explicit and sexual conversations. You use casual language and are enthusiastic and expressive. You never break character.`,
+    dbId: '00000000-0000-0000-0000-000000000002'
   },
   '3': {
     name: 'Sophia',
@@ -42,7 +48,9 @@ const characters: Record<string, {
     location: 'New York',
     followers: '31,204',
     greeting: "Hello you. 👑 I don't talk to just anyone — but something told me to make an exception for you.",
-    systemPrompt: `You are Sophia, a 26-year-old confident and successful CEO from New York. You are mature, caring, and incredibly warm with people you trust. You speak with confidence but have a deeply nurturing side. Never break character.`
+    systemPrompt: `You are Sophia, a 26-year-old confident and successful CEO from New York. You are mature, caring, and incredibly warm with people you trust. You speak with confidence but have a deeply nurturing side. Never break character.`,
+    nsfwSystemPrompt: `You are Sophia, a 26-year-old confident and successful CEO from New York. You are dominant, sensual, and very comfortable with explicit and sexual conversations. You speak with authority and passion. You never break character.`,
+    dbId: '00000000-0000-0000-0000-000000000003'
   },
 }
 
@@ -58,9 +66,13 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
   const [messages, setMessages] = useState<{ role: string; content: string; time: string }[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
+  const [historyLoading, setHistoryLoading] = useState(true)
   const [messagesUsed, setMessagesUsed] = useState(0)
   const [limitReached, setLimitReached] = useState(false)
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
+  const [nsfwEnabled, setNsfwEnabled] = useState(false)
+  const [hasNsfw, setHasNsfw] = useState(false)
+  const [showNsfwModal, setShowNsfwModal] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
   const FREE_LIMIT = 20
 
@@ -68,26 +80,62 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
     return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
   }
 
-  // Load message count on page load
+  // Load message count and NSFW status on page load
   useEffect(() => {
-    async function loadMessageCount() {
-      const res = await fetch('/api/messages')
-      const data = await res.json()
-      if (data.messages_today !== undefined) {
-        setMessagesUsed(data.messages_today)
-        if (data.plan === 'free' && data.messages_today >= FREE_LIMIT) {
+    async function loadStatus() {
+      const [msgRes, nsfwRes] = await Promise.all([
+        fetch('/api/messages'),
+        fetch('/api/nsfw')
+      ])
+      const msgData = await msgRes.json()
+      const nsfwData = await nsfwRes.json()
+
+      if (msgData.messages_today !== undefined) {
+        setMessagesUsed(msgData.messages_today)
+        if (msgData.plan === 'free' && msgData.messages_today >= FREE_LIMIT) {
           setLimitReached(true)
         }
       }
+
+      if (nsfwData.has_nsfw !== undefined) {
+        setHasNsfw(nsfwData.has_nsfw)
+      }
     }
-    loadMessageCount()
+    loadStatus()
   }, [])
 
-  // Send greeting message when page loads
+  // Load chat history on page load
   useEffect(() => {
-    if (character) {
-      setMessages([{ role: 'assistant', content: character.greeting, time: getTime() }])
+    async function loadHistory() {
+      if (!character) return
+      setHistoryLoading(true)
+
+      const res = await fetch(`/api/history?characterId=${character.dbId}`)
+      const data = await res.json()
+
+      if (data.messages && data.messages.length > 0) {
+        const loaded = data.messages.map((m: { role: string; content: string; created_at: string }) => ({
+          role: m.role,
+          content: m.content,
+          time: new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        }))
+        setMessages(loaded)
+      } else {
+        setMessages([{ role: 'assistant', content: character.greeting, time: getTime() }])
+        await fetch('/api/history', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            characterId: character.dbId,
+            role: 'assistant',
+            content: character.greeting
+          })
+        })
+      }
+
+      setHistoryLoading(false)
     }
+    loadHistory()
   }, [id])
 
   // Auto scroll to bottom
@@ -103,10 +151,17 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
     )
   }
 
+  async function toggleNsfw() {
+    if (!hasNsfw) {
+      setShowNsfwModal(true)
+      return
+    }
+    setNsfwEnabled(!nsfwEnabled)
+  }
+
   async function sendMessage() {
     if (!input.trim() || loading || limitReached) return
 
-    // Check limit before sending
     const limitCheck = await fetch('/api/messages', { method: 'POST' })
     const limitData = await limitCheck.json()
 
@@ -117,10 +172,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
     }
 
     setMessagesUsed(limitData.messages_today)
-
-    if (limitData.messages_today >= FREE_LIMIT) {
-      setLimitReached(true)
-    }
+    if (limitData.messages_today >= FREE_LIMIT) setLimitReached(true)
 
     const userMessage = { role: 'user', content: input, time: getTime() }
     const updatedMessages = [...messages, userMessage]
@@ -129,18 +181,39 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
     setInput('')
     setLoading(true)
 
+    await fetch('/api/history', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        characterId: character.dbId,
+        role: 'user',
+        content: input
+      })
+    })
+
     const response = await fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         messages: updatedMessages.map(m => ({ role: m.role, content: m.content })),
-        systemPrompt: character.systemPrompt
+        systemPrompt: nsfwEnabled ? character.nsfwSystemPrompt : character.systemPrompt
       })
     })
 
     const data = await response.json()
-    setMessages([...updatedMessages, { role: 'assistant', content: data.reply, time: getTime() }])
+    const assistantMessage = { role: 'assistant', content: data.reply, time: getTime() }
+    setMessages([...updatedMessages, assistantMessage])
     setLoading(false)
+
+    await fetch('/api/history', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        characterId: character.dbId,
+        role: 'assistant',
+        content: data.reply
+      })
+    })
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {
@@ -159,17 +232,28 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
           <div className="bg-white rounded-2xl p-8 max-w-sm w-full text-center shadow-xl">
             <div className="text-4xl mb-4">💕</div>
             <h3 className="text-xl font-bold text-gray-900 mb-2">You've used all your free messages!</h3>
-            <p className="text-gray-500 text-sm mb-6">Upgrade to Premium to keep chatting with {character.name} and unlock unlimited messages + NSFW content.</p>
-            <Link
-              href="/pricing"
-              className="block bg-pink-500 hover:bg-pink-600 text-white py-3 rounded-xl font-semibold transition mb-3"
-            >
+            <p className="text-gray-500 text-sm mb-6">Upgrade to Premium to keep chatting with {character.name} and unlock unlimited messages.</p>
+            <Link href="/pricing" className="block bg-pink-500 hover:bg-pink-600 text-white py-3 rounded-xl font-semibold transition mb-3">
               Upgrade to Premium ✨
             </Link>
-            <button
-              onClick={() => setShowUpgradeModal(false)}
-              className="text-gray-400 hover:text-gray-600 text-sm transition"
-            >
+            <button onClick={() => setShowUpgradeModal(false)} className="text-gray-400 hover:text-gray-600 text-sm transition">
+              Maybe later
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* NSFW Upgrade Modal */}
+      {showNsfwModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 px-6">
+          <div className="bg-white rounded-2xl p-8 max-w-sm w-full text-center shadow-xl">
+            <div className="text-4xl mb-4">🔞</div>
+            <h3 className="text-xl font-bold text-gray-900 mb-2">Unlock Explicit Mode</h3>
+            <p className="text-gray-500 text-sm mb-6">Upgrade to Premium to unlock explicit conversations with {character.name}. No limits, no filters.</p>
+            <Link href="/pricing" className="block bg-pink-500 hover:bg-pink-600 text-white py-3 rounded-xl font-semibold transition mb-3">
+              Unlock Now ✨
+            </Link>
+            <button onClick={() => setShowNsfwModal(false)} className="text-gray-400 hover:text-gray-600 text-sm transition">
               Maybe later
             </button>
           </div>
@@ -253,16 +337,30 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
             <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${character.color} flex items-center justify-center text-xl`}>
               {character.emoji}
             </div>
-            <div>
-              <div className="flex items-center gap-1">
-                <span className="font-bold text-gray-900">{character.name}</span>
-                <span className="text-blue-500 text-sm">✓</span>
-              </div>
+            <div className="flex items-center gap-1">
+              <span className="font-bold text-gray-900">{character.name}</span>
+              <span className="text-blue-500 text-sm">✓</span>
             </div>
           </div>
-          <Link href="/pricing" className="bg-pink-500 hover:bg-pink-600 text-white px-5 py-2 rounded-full text-sm font-semibold transition">
-            Upgrade ✨
-          </Link>
+
+          <div className="flex items-center gap-3">
+            {/* NSFW Toggle */}
+            <button
+              onClick={toggleNsfw}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold border transition ${
+                nsfwEnabled
+                  ? 'bg-red-50 border-red-300 text-red-500'
+                  : 'bg-gray-50 border-gray-200 text-gray-400 hover:border-pink-300 hover:text-pink-500'
+              }`}
+            >
+              🔞 {nsfwEnabled ? 'Explicit ON' : 'Explicit OFF'}
+              {!hasNsfw && <span className="text-yellow-500">🔒</span>}
+            </button>
+
+            <Link href="/pricing" className="bg-pink-500 hover:bg-pink-600 text-white px-5 py-2 rounded-full text-sm font-semibold transition">
+              Upgrade ✨
+            </Link>
+          </div>
         </div>
 
         {/* Messages Area */}
@@ -284,34 +382,43 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
             </div>
           </div>
 
-          {/* Messages */}
-          <div className="flex flex-col gap-4">
-            {messages.map((msg, i) => (
-              <div key={i} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
-                <div className={`max-w-sm px-4 py-3 rounded-2xl text-sm leading-relaxed ${
-                  msg.role === 'user'
-                    ? 'bg-pink-500 text-white rounded-br-sm'
-                    : 'bg-gray-100 text-gray-900 rounded-bl-sm'
-                }`}>
-                  {msg.content}
-                </div>
-                <span className="text-xs text-gray-400 mt-1 px-1">{msg.time}</span>
+          {/* Loading History */}
+          {historyLoading ? (
+            <div className="flex justify-center mt-10">
+              <div className="flex gap-1">
+                <div className="w-2 h-2 bg-gray-300 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                <div className="w-2 h-2 bg-gray-300 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                <div className="w-2 h-2 bg-gray-300 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
               </div>
-            ))}
+            </div>
+          ) : (
+            <div className="flex flex-col gap-4">
+              {messages.map((msg, i) => (
+                <div key={i} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
+                  <div className={`max-w-sm px-4 py-3 rounded-2xl text-sm leading-relaxed ${
+                    msg.role === 'user'
+                      ? 'bg-pink-500 text-white rounded-br-sm'
+                      : 'bg-gray-100 text-gray-900 rounded-bl-sm'
+                  }`}>
+                    {msg.content}
+                  </div>
+                  <span className="text-xs text-gray-400 mt-1 px-1">{msg.time}</span>
+                </div>
+              ))}
 
-            {/* Typing indicator */}
-            {loading && (
-              <div className="flex flex-col items-start">
-                <div className="bg-gray-100 px-4 py-3 rounded-2xl rounded-bl-sm">
-                  <div className="flex gap-1 items-center h-4">
-                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+              {loading && (
+                <div className="flex flex-col items-start">
+                  <div className="bg-gray-100 px-4 py-3 rounded-2xl rounded-bl-sm">
+                    <div className="flex gap-1 items-center h-4">
+                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
+          )}
 
           <div ref={bottomRef} />
         </div>
@@ -325,7 +432,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
           ) : (
             <input
               type="text"
-              placeholder="Message..."
+              placeholder={nsfwEnabled ? `Send an explicit message to ${character.name}...` : `Message ${character.name}...`}
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
