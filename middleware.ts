@@ -1,0 +1,43 @@
+import { createServerClient } from '@supabase/ssr'
+import { NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
+
+export async function middleware(req: NextRequest) {
+  const res = NextResponse.next()
+
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return req.cookies.getAll()
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value, options }) => {
+            req.cookies.set(name, value)
+            res.cookies.set(name, value, options)
+          })
+        },
+      },
+    }
+  )
+
+  const { data: { session } } = await supabase.auth.getSession()
+
+  // If user tries to access chat without being logged in
+  if (req.nextUrl.pathname.startsWith('/chat') && !session) {
+    return NextResponse.redirect(new URL('/login', req.url))
+  }
+
+  // If logged in user tries to access login page, send them to characters
+  if (req.nextUrl.pathname === '/login' && session) {
+    return NextResponse.redirect(new URL('/characters', req.url))
+  }
+
+  return res
+}
+
+export const config = {
+  matcher: ['/chat/:path*', '/login']
+}

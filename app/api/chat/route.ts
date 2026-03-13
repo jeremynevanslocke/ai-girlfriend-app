@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
       'X-Title': 'DreamCompanion'
     },
     body: JSON.stringify({
-      model: 'neversleep/noromaid-20b',
+      model: 'arcee-ai/trinity-large-preview:free',
       messages: [
         { role: 'system', content: systemPrompt },
         ...messages

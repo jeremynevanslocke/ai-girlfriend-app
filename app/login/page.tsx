@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { supabase } from '../lib/supabase'
+import { createBrowserClient } from '@supabase/ssr'
 import Link from 'next/link'
 
 export default function LoginPage() {
@@ -11,6 +11,11 @@ export default function LoginPage() {
   const [message, setMessage] = useState('')
   const [loading, setLoading] = useState(false)
 
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
+
   async function handleSubmit() {
     setLoading(true)
     setMessage('')
@@ -18,22 +23,30 @@ export default function LoginPage() {
     if (isSignUp) {
       const { error } = await supabase.auth.signUp({ email, password })
       if (error) setMessage(error.message)
-      else setMessage('Account created! You can now log in.')
+      else setMessage('Account created! You can now sign in.')
     } else {
-      const { error } = await supabase.auth.signInWithPassword({ email, password })
-      if (error) setMessage(error.message)
-      else window.location.href = '/characters'
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+      if (error) {
+        setMessage(error.message)
+      } else if (data.session) {
+        window.location.href = '/characters'
+      }
     }
 
     setLoading(false)
   }
 
   return (
-    <main className="min-h-screen bg-gray-950 text-white flex flex-col items-center justify-center px-6">
+    <main className="min-h-screen bg-gray-50 text-gray-900 flex flex-col items-center justify-center px-6">
 
-      <Link href="/" className="text-2xl font-bold text-pink-500 mb-10">💕 DreamCompanion</Link>
+      <Link href="/" className="mb-10">
+        <h1 className="text-3xl font-black">
+          <span className="text-black">Dream</span>
+          <span className="text-pink-500">companion</span>
+        </h1>
+      </Link>
 
-      <div className="bg-gray-900 rounded-2xl p-10 w-full max-w-md">
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-10 w-full max-w-md">
         <h2 className="text-2xl font-bold mb-2">{isSignUp ? 'Create Account' : 'Welcome Back'}</h2>
         <p className="text-gray-400 mb-8">{isSignUp ? 'Join thousands of users today.' : 'Sign in to continue.'}</p>
 
@@ -43,18 +56,18 @@ export default function LoginPage() {
             placeholder="Email address"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="bg-gray-800 rounded-xl px-4 py-3 text-white placeholder-gray-500 outline-none focus:ring-2 focus:ring-pink-500"
+            className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-gray-900 placeholder-gray-400 outline-none focus:ring-2 focus:ring-pink-500"
           />
           <input
             type="password"
             placeholder="Password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="bg-gray-800 rounded-xl px-4 py-3 text-white placeholder-gray-500 outline-none focus:ring-2 focus:ring-pink-500"
+            className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-gray-900 placeholder-gray-400 outline-none focus:ring-2 focus:ring-pink-500"
           />
 
           {message && (
-            <p className="text-sm text-pink-400">{message}</p>
+            <p className="text-sm text-pink-500">{message}</p>
           )}
 
           <button
@@ -67,7 +80,7 @@ export default function LoginPage() {
 
           <button
             onClick={() => setIsSignUp(!isSignUp)}
-            className="text-gray-400 hover:text-white text-sm transition"
+            className="text-gray-400 hover:text-gray-600 text-sm transition"
           >
             {isSignUp ? 'Already have an account? Sign in' : "Don't have an account? Sign up"}
           </button>

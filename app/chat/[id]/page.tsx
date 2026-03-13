@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
+import { createBrowserClient } from '@supabase/ssr'
 
 const characters: Record<string, {
   name: string
@@ -48,6 +49,12 @@ const characters: Record<string, {
 export default function ChatPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = React.use(params)
   const character = characters[id]
+
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
+
   const [messages, setMessages] = useState<{ role: string; content: string; time: string }[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
@@ -125,8 +132,17 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
         </div>
 
         {/* Contacts Header */}
-        <div className="px-6 py-4">
+        <div className="px-6 py-4 flex items-center justify-between">
           <h2 className="text-lg font-bold text-gray-900">Your contacts</h2>
+          <button
+            onClick={async () => {
+              await supabase.auth.signOut()
+              window.location.href = '/login'
+            }}
+            className="text-xs text-gray-400 hover:text-gray-600 transition"
+          >
+            Log out
+          </button>
         </div>
 
         {/* Contact List */}
