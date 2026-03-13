@@ -58,11 +58,30 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
   const [messages, setMessages] = useState<{ role: string; content: string; time: string }[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
+  const [messagesUsed, setMessagesUsed] = useState(0)
+  const [limitReached, setLimitReached] = useState(false)
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
+  const FREE_LIMIT = 20
 
   function getTime() {
     return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
   }
+
+  // Load message count on page load
+  useEffect(() => {
+    async function loadMessageCount() {
+      const res = await fetch('/api/messages')
+      const data = await res.json()
+      if (data.messages_today !== undefined) {
+        setMessagesUsed(data.messages_today)
+        if (data.plan === 'free' && data.messages_today >= FREE_LIMIT) {
+          setLimitReached(true)
+        }
+      }
+    }
+    loadMessageCount()
+  }, [])
 
   // Send greeting message when page loads
   useEffect(() => {
@@ -85,7 +104,23 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
   }
 
   async function sendMessage() {
-    if (!input.trim() || loading) return
+    if (!input.trim() || loading || limitReached) return
+
+    // Check limit before sending
+    const limitCheck = await fetch('/api/messages', { method: 'POST' })
+    const limitData = await limitCheck.json()
+
+    if (limitData.error === 'limit_reached') {
+      setLimitReached(true)
+      setShowUpgradeModal(true)
+      return
+    }
+
+    setMessagesUsed(limitData.messages_today)
+
+    if (limitData.messages_today >= FREE_LIMIT) {
+      setLimitReached(true)
+    }
 
     const userMessage = { role: 'user', content: input, time: getTime() }
     const updatedMessages = [...messages, userMessage]
@@ -117,6 +152,29 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
+
+      {/* Upgrade Modal */}
+      {showUpgradeModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 px-6">
+          <div className="bg-white rounded-2xl p-8 max-w-sm w-full text-center shadow-xl">
+            <div className="text-4xl mb-4">💕</div>
+            <h3 className="text-xl font-bold text-gray-900 mb-2">You've used all your free messages!</h3>
+            <p className="text-gray-500 text-sm mb-6">Upgrade to Premium to keep chatting with {character.name} and unlock unlimited messages + NSFW content.</p>
+            <Link
+              href="/pricing"
+              className="block bg-pink-500 hover:bg-pink-600 text-white py-3 rounded-xl font-semibold transition mb-3"
+            >
+              Upgrade to Premium ✨
+            </Link>
+            <button
+              onClick={() => setShowUpgradeModal(false)}
+              className="text-gray-400 hover:text-gray-600 text-sm transition"
+            >
+              Maybe later
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Sidebar */}
       <div className="w-80 bg-white border-r border-gray-200 flex flex-col">
@@ -164,6 +222,26 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
             </Link>
           ))}
         </div>
+
+        {/* Message Counter */}
+        <div className="px-6 py-4 border-t border-gray-100">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs text-gray-500">Free messages today</span>
+            <span className="text-xs font-semibold text-gray-700">{messagesUsed} / {FREE_LIMIT}</span>
+          </div>
+          <div className="w-full bg-gray-100 rounded-full h-1.5">
+            <div
+              className="bg-pink-500 h-1.5 rounded-full transition-all"
+              style={{ width: `${Math.min((messagesUsed / FREE_LIMIT) * 100, 100)}%` }}
+            />
+          </div>
+          {limitReached && (
+            <Link href="/pricing" className="block mt-3 text-center bg-pink-500 hover:bg-pink-600 text-white py-2 rounded-xl text-xs font-semibold transition">
+              Upgrade for unlimited ✨
+            </Link>
+          )}
+        </div>
+
       </div>
 
       {/* Chat Area */}
@@ -182,9 +260,9 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
               </div>
             </div>
           </div>
-          <button className="bg-pink-500 hover:bg-pink-600 text-white px-5 py-2 rounded-full text-sm font-semibold transition">
+          <Link href="/pricing" className="bg-pink-500 hover:bg-pink-600 text-white px-5 py-2 rounded-full text-sm font-semibold transition">
             Upgrade ✨
-          </button>
+          </Link>
         </div>
 
         {/* Messages Area */}
@@ -240,17 +318,23 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
 
         {/* Input Bar */}
         <div className="px-6 py-4 border-t border-gray-200 flex items-center gap-3 bg-white">
-          <input
-            type="text"
-            placeholder="Message..."
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            className="flex-1 bg-transparent text-gray-900 placeholder-gray-400 outline-none text-sm"
-          />
+          {limitReached ? (
+            <div className="flex-1 text-center">
+              <p className="text-gray-400 text-sm">You've reached your free limit.</p>
+            </div>
+          ) : (
+            <input
+              type="text"
+              placeholder="Message..."
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              className="flex-1 bg-transparent text-gray-900 placeholder-gray-400 outline-none text-sm"
+            />
+          )}
           <button
-            onClick={sendMessage}
-            disabled={loading || !input.trim()}
+            onClick={limitReached ? () => setShowUpgradeModal(true) : sendMessage}
+            disabled={loading || (!limitReached && !input.trim())}
             className="text-pink-500 hover:text-pink-600 disabled:opacity-30 transition"
           >
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
