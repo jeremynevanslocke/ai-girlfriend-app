@@ -5,8 +5,8 @@ const characters = [
     id: '1',
     name: 'Luna',
     age: 24,
-    bio: 'A dreamy artist who loves deep conversations about life and the universe.',
-    tags: ['Sweet', 'Romantic', 'Creative'],
+    location: 'Los Angeles',
+    bio: '24 year old dreamy artist from LA. Romantic soul.',
     emoji: '🌙',
     color: 'from-purple-500 to-pink-500'
   },
@@ -14,8 +14,8 @@ const characters = [
     id: '2',
     name: 'Aria',
     age: 22,
-    bio: 'A bubbly gamer girl who loves anime, competitions, and staying up late.',
-    tags: ['Playful', 'Gamer', 'Energetic'],
+    location: 'Tokyo',
+    bio: '22 y/o gamer girl from Tokyo. Love anime and EDM.',
     emoji: '🎮',
     color: 'from-blue-500 to-cyan-500'
   },
@@ -23,8 +23,8 @@ const characters = [
     id: '3',
     name: 'Sophia',
     age: 26,
-    bio: 'A confident CEO by day, incredibly caring and warm behind closed doors.',
-    tags: ['Confident', 'Caring', 'Mature'],
+    location: 'New York',
+    bio: '26 year old CEO from New York. Passionate about life.',
     emoji: '👑',
     color: 'from-amber-500 to-orange-500'
   },
@@ -32,55 +32,56 @@ const characters = [
 
 export default function CharactersPage() {
   return (
-    <main className="min-h-screen bg-gray-950 text-white">
+    <div className="min-h-screen bg-gray-50 flex">
 
-      {/* Navigation */}
-      <nav className="flex items-center justify-between px-8 py-5 border-b border-gray-800">
-        <Link href="/" className="text-2xl font-bold text-pink-500">💕 DreamCompanion</Link>
-        <Link href="/login" className="bg-pink-500 hover:bg-pink-600 text-white px-4 py-2 rounded-full text-sm font-medium transition">
-          Sign In
-        </Link>
-      </nav>
+      {/* Sidebar */}
+      <div className="w-80 bg-white border-r border-gray-200 flex flex-col">
 
-      {/* Header */}
-      <section className="text-center px-6 py-16">
-        <h2 className="text-4xl font-bold mb-4">Meet Your Companions</h2>
-        <p className="text-gray-400 text-lg">Choose a character and start your story.</p>
-      </section>
+        {/* Logo */}
+        <div className="px-6 py-5 border-b border-gray-100">
+          <h1 className="text-2xl font-black">
+            <span className="text-black">Dream</span>
+            <span className="text-pink-500">companion</span>
+          </h1>
+        </div>
 
-      {/* Character Cards */}
-      <section className="grid grid-cols-1 md:grid-cols-3 gap-8 px-8 pb-20 max-w-5xl mx-auto">
-        {characters.map((char) => (
-          <div key={char.id} className="bg-gray-900 rounded-2xl overflow-hidden hover:scale-105 transition-transform duration-200">
+        {/* Contacts Header */}
+        <div className="px-6 py-4">
+          <h2 className="text-lg font-bold text-gray-900">Your contacts</h2>
+        </div>
 
-            {/* Character Image Placeholder */}
-            <div className={`h-64 bg-gradient-to-br ${char.color} flex items-center justify-center`}>
-              <span className="text-8xl">{char.emoji}</span>
-            </div>
-
-            {/* Character Info */}
-            <div className="p-6">
-              <div className="flex items-center gap-2 mb-2">
-                <h3 className="text-xl font-bold">{char.name}</h3>
-                <span className="text-gray-400 text-sm">Age {char.age}</span>
+        {/* Contact List */}
+        <div className="flex-1 overflow-y-auto">
+          {characters.map((char) => (
+            <Link key={char.id} href={`/chat/${char.id}`}>
+              <div className="flex items-center gap-4 px-6 py-4 hover:bg-gray-50 cursor-pointer transition border-b border-gray-50">
+                {/* Avatar */}
+                <div className={`w-14 h-14 rounded-full bg-gradient-to-br ${char.color} flex items-center justify-center text-2xl flex-shrink-0`}>
+                  {char.emoji}
+                </div>
+                {/* Info */}
+                <div>
+                  <div className="flex items-center gap-1">
+                    <span className="font-semibold text-gray-900">{char.name}</span>
+                    <span className="text-blue-500 text-sm">✓</span>
+                  </div>
+                  <p className="text-sm text-gray-500 leading-snug">{char.bio}</p>
+                </div>
               </div>
-              <p className="text-gray-400 text-sm mb-4">{char.bio}</p>
+            </Link>
+          ))}
+        </div>
+      </div>
 
-              {/* Tags */}
-              <div className="flex flex-wrap gap-2 mb-6">
-                {char.tags.map(tag => (
-                  <span key={tag} className="bg-gray-800 text-gray-300 text-xs px-3 py-1 rounded-full">{tag}</span>
-                ))}
-              </div>
+      {/* Main Area - No character selected */}
+      <div className="flex-1 flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="text-6xl mb-4">💕</div>
+          <h3 className="text-xl font-semibold text-gray-700">Select a companion</h3>
+          <p className="text-gray-400 mt-2">Choose someone from your contacts to start chatting</p>
+        </div>
+      </div>
 
-              <Link href={`/chat/${char.id}`} className="block text-center bg-pink-500 hover:bg-pink-600 text-white py-3 rounded-xl font-semibold transition">
-                Start Chatting →
-              </Link>
-            </div>
-          </div>
-        ))}
-      </section>
-
-    </main>
+    </div>
   )
 }
